@@ -215,13 +215,21 @@ void MarlinMuonID::processEvent( LCEvent * evt ) {
     // --- Declare the track a muon if more than _nHitsMatch hits of muon detectors are associated to it
     if ( n_matchedHits > _nHitsMatch ){
 
+      // --- Get the track state at IP to build the muon momentum
+      const lcio::TrackState* ts_atIP = trk->getTrackState( lcio::TrackState::AtIP );
+      if ( !ts_atIP ){
+	streamlog_out(WARNING) << " MarlinMuonID::processEvent(): skipped track #" << itrk
+			       << ", no track state at IP" << std::endl;
+	continue;
+      }
+
       // --- Create a ReconstructedParticle to store the identified muon
       IMPL::ReconstructedParticleImpl *const muon(new ReconstructedParticleImpl());
 
       const float charge = ( ts_atCAL->getOmega()>0. ? 1. : -1 );
       const int pdg = ( charge < 0. ? _muonPDG : -_muonPDG ); 
-      const float momentum[3] = { trk_pt * std::cos(trk_phi),
-	                          trk_pt * std::sin(trk_phi),
+      const float momentum[3] = { trk_pt * std::cos(ts_atIP->getPhi()),
+	                          trk_pt * std::sin(ts_atIP->getPhi()),
 				  trk_pt * trk_cotTheta };
       muon->setMomentum(momentum);
       muon->setEnergy(std::sqrt(momentum[0]*momentum[0] + momentum[1]*momentum[1] +
