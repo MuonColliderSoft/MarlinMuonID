@@ -12,7 +12,7 @@
  * @parameter InputMuonHitCollection Name of the muon hit input collection 
  * @parameter OutputMuonCollection Name of the reconstructed muon output collection
  *
- * @parameter DeltaRMatch DeltaR for matching tracks with muon detector hits
+ * @parameter DeltaRMatch DeltaR for matching tracks with muon detector hits in barrel and endcaps
  * @parameter NHitsMatch Minumum number of matching hits in the muon detector
  *
  * @parameter FillHistograms Flag to enable diagnostic histograms
@@ -65,7 +65,7 @@ private:
 
   float _bField = 5.;
 
-  float _deltaRMatch = 0.25;
+  std::vector<float> _deltaRMatch = {0.2, 0.3}; // 0 --> barrel, 1 --> endcaps
   int _nHitsMatch = 4;
 
   bool _fillHistos = false;

@@ -18,7 +18,7 @@ muonID.Parameters = {
     "InputTrackCollection": ["SiTracks"],
     "InputMuonHitCollection": ["Muon_digi"],
     "OutputMuonCollection": ["RecoMuons"],
-    "DeltaRMatch": ["0.3"],
+    "DeltaRMatch": ["0.2", "0.3"], # for barrel and endcaps
     "NHitsMatch": ["4"],
     "FillHistograms":["false"]
 }

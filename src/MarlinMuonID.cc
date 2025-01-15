@@ -45,7 +45,7 @@ MarlinMuonID::MarlinMuonID()
 			    );
 
   registerProcessorParameter( "DeltaRMatch",
-			      "DeltaR for matching tracks with muon detector hits",
+			      "DeltaR for matching tracks with muon detector hits in barrel and endcaps",
 			      _deltaRMatch,
 			      _deltaRMatch
 			      );
@@ -59,7 +59,8 @@ MarlinMuonID::MarlinMuonID()
   registerProcessorParameter( "FillHistograms",
 			      "Fill the diagnostic histograms",
 			      _fillHistos,
-			      _fillHistos );
+			      _fillHistos
+			      );
 
 }
 
@@ -202,7 +203,7 @@ void MarlinMuonID::processEvent( LCEvent * evt ) {
       }
 
       // --- Check if the hit is matched to the track
-      if ( deltaR < _deltaRMatch ) 
+      if ( deltaR < _deltaRMatch[system-_muonDetBarrel] )
 	n_matchedHits++;
 	
     } // ihit loop
@@ -221,7 +222,7 @@ void MarlinMuonID::processEvent( LCEvent * evt ) {
       const int pdg = ( charge < 0. ? _muonPDG : -_muonPDG ); 
       const float momentum[3] = { trk_pt * std::cos(trk_phi),
 	                          trk_pt * std::sin(trk_phi),
-				  trk_pt * std::cos(trk_theta) };
+				  trk_pt * trk_cotTheta };
       muon->setMomentum(momentum);
       muon->setEnergy(std::sqrt(momentum[0]*momentum[0] + momentum[1]*momentum[1] +
 				momentum[2]*momentum[2] + _muonMass*_muonMass));
