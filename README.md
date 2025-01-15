@@ -1,5 +1,5 @@
 # MarlinMuonID
-Marlin Muon ID Processor
+### Marlin Muon ID Processor
 
 This Marlin processor implements a simple muon identification algorithm, matching tracks to hits in the outer muon detectors:
 
@@ -18,8 +18,8 @@ muonID.Parameters = {
     "InputTrackCollection": ["SiTracks"],
     "InputMuonHitCollection": ["Muon_digi"],
     "OutputMuonCollection": ["RecoMuons"],
-    "DeltaRMatch": ["0.1"],
-    "NHitsMatch": ["5"],
+    "DeltaRMatch": ["0.3"],
+    "NHitsMatch": ["4"],
     "FillHistograms":["false"]
 }
 ```
