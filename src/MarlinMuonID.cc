@@ -14,28 +14,31 @@
 #include "marlin/AIDAProcessor.h"
 #include "marlin/Global.h"
 
+#include "Objects/Helix.h"
+#include "Pandora/Pandora.h"
+
 #include "gsl/gsl_randist.h"
 
 #include "math.h"
 
 
-MarlinMuonID aMarlinMuonID ;
+MarlinMuonID aMarlinMuonID;
 
 MarlinMuonID::MarlinMuonID()
   : Processor("MarlinMuonID") {
 
-  _description = "MarlinMuonID performs muon ID by matching tracks to muon detector hits." ;
+  _description = "MarlinMuonID performs muon ID by matching tracks to muon detector hits.";
 
   // --- Register the steering parameters
   registerInputCollection( LCIO::TRACK,
-		  	   "InputTrackCollection",
+			   "InputTrackCollection",
 			   "Track input collection",
 			   _inputTrackCollection,
 			   _inputTrackCollection
 			   );
 
   registerInputCollection( LCIO::CALORIMETERHIT,
-		  	   "InputMuonHitCollection",
+			   "InputMuonHitCollection",
 			   "Muon hit input collection",
 			   _inputMuonHitCollection,
 			   _inputMuonHitCollection
@@ -64,12 +67,6 @@ MarlinMuonID::MarlinMuonID()
 			      "Maximum track longitudinal impact parameter",
 			      _z0_max,
 			      _z0_max
-			      );
-
-  registerProcessorParameter( "MuonHitsSpatialResolution",
-			      "Spatial resolution of the muon detector hits",
-			      _xyzResolution,
-			      _xyzResolution
 			      );
 
   registerProcessorParameter( "MuonHitsTimeResolution",
@@ -174,9 +171,9 @@ void MarlinMuonID::init() {
     }
 
     _hDeltaR_vs_Pt = new TH2D("hDeltaR_vs_Pt", "#DeltaR vs p_{T}^{trk};p_{T}^{trk} [GeV];#DeltaR [rad]",
-				 200, 0., 100., 200, 0., 0.5);
+			      200, 0., 100., 200, 0., 0.5);
     _hDeltaT_vs_Pt = new TH2D("hDeltaT_vs_Pt", "#DeltaT vs p_{T}^{trk};p_{T}^{trk} [GeV];#DeltaT [ns]",
-				 200, 0., 100., 200, -0.5, 3.5);
+			      200, 0., 100., 200, -0.5, 3.5);
     _hDeltaR_vs_Theta = new TH2D("hDeltaR_vs_Theta", "#DeltaR vs #theta_{trk};#theta_{trk} [#circ];#DeltaR [rad]",
 				 200, 0., M_PI, 200, 0., 0.5);
     _hDeltaT_vs_Theta = new TH2D("hDeltaT_vs_Theta", "#DeltaT vs #theta_{trk};#theta_{trk} [#circ];#DeltaT [ns]",
@@ -227,7 +224,19 @@ void MarlinMuonID::processEvent( LCEvent * evt ) {
       continue;
     }
 
-    // --- Find the track intersection point on the calorimeter inner surface
+    const float trk_pt = 0.000299792458 * _bField / std::fabs(ts_atIP->getOmega());
+    const float trk_cotTheta = ts_atIP->getTanLambda();
+    const float trk_phi = ts_atIP->getPhi();
+    const float trk_theta = M_PI_2 - std::atan(trk_cotTheta);
+    const float trk_d0 = ts_atIP->getD0();
+    const float trk_z0 = ts_atIP->getZ0();
+
+    // --- Track selection
+    if ( trk_pt < _pt_min ) continue;
+    if ( std::fabs(trk_d0) > _d0_max || std::fabs(trk_z0) > _z0_max ) continue;
+
+
+    // --- Get the track state at ECAL
     const lcio::TrackState* ts_atCAL = trk->getTrackState( lcio::TrackState::AtCalorimeter );
     if ( !ts_atCAL ){
       streamlog_out(WARNING) << " MarlinMuonID::processEvent(): skipped track #" << itrk
@@ -235,35 +244,50 @@ void MarlinMuonID::processEvent( LCEvent * evt ) {
       continue;
     }
     
-    const float trk_cotTheta = ts_atCAL->getTanLambda();
-    const float trk_pt = 0.000299792458 * _bField / std::fabs(ts_atCAL->getOmega());
-    const float trk_phi = ts_atCAL->getPhi();
-    const float trk_theta = M_PI_2 - std::atan(trk_cotTheta);
-
-    // --- Track selection
-    if ( trk_pt < _pt_min ) continue; 
-    if ( std::fabs(ts_atIP->getD0()) > _d0_max || std::fabs(ts_atIP->getZ0()) > _z0_max ) continue;
-
     // --- Calulate the track length
-    float deltaPhi = fabs(trk_phi - ts_atIP->getPhi());
-    if ( deltaPhi > M_PI ){
-      deltaPhi = 2.*M_PI - deltaPhi;
-    }
-    const float trk_length = deltaPhi / std::fabs(ts_atCAL->getOmega()) *
-      std::sqrt(1. + ts_atIP->getTanLambda()*ts_atIP->getTanLambda());
+    float deltaPhi = fabs(ts_atCAL->getPhi() - trk_phi);
+    if ( deltaPhi > M_PI ) deltaPhi -= 2.*M_PI;
+    if ( deltaPhi < -M_PI ) deltaPhi += 2.*M_PI;
 
-    // --- Find the track intersection point with the ECAL inner surface
-    float x_ecal, y_ecal, z_ecal;
-    z_ecal = _ecalB_inner_r * trk_cotTheta;
-    if ( fabs(z_ecal) > _ecalE_min_z ){
-      z_ecal = ( z_ecal>0. ? _ecalE_min_z : -_ecalE_min_z );
-      float r = z_ecal / trk_cotTheta;
-      x_ecal = r * std::cos(trk_phi);
-      y_ecal = r * std::sin(trk_phi);
-    }
-    else {
-      x_ecal = _ecalB_inner_r * std::cos(trk_phi);
-      y_ecal = _ecalB_inner_r * std::sin(trk_phi);
+    const float trk_length = deltaPhi / std::fabs(ts_atIP->getOmega()) *
+      std::sqrt(1. + trk_cotTheta*trk_cotTheta);
+
+
+    // --- Get the track intersection point with the ECAL inner surface
+    float x_ecal = ts_atCAL->getReferencePoint()[0];
+    float y_ecal = ts_atCAL->getReferencePoint()[1];
+    float z_ecal = ts_atCAL->getReferencePoint()[2];
+
+    // If the reference point at the calorimeter is not available, extrapolate the track
+    // to the ECAL inner surface using a helix
+    float tof_correction = 0.;
+    if ( x_ecal==0. || y_ecal==0. || z_ecal==0. ){
+
+      if ( std::fabs(ts_atIP->getOmega()) < std::numeric_limits<float>::epsilon() ) continue;
+
+      pandora::Helix helix(trk_phi, trk_d0, trk_z0, ts_atIP->getOmega(), trk_cotTheta, _bField);
+
+      const pandora::CartesianVector &referencePoint(helix.GetReferencePoint());
+      pandora::CartesianVector intersectionPoint(0.f, 0.f, 0.f);
+
+      // If the track reaches the ECAL endcap:
+      if ( fabs(_ecalB_inner_r * trk_cotTheta) > _ecalE_min_z ){
+	const float signPz((helix.GetMomentum().GetZ() > 0.f) ? 1.f : -1.f);
+	helix.GetPointInZ(signPz*_ecalE_min_z, referencePoint, intersectionPoint);
+      }
+      // If the track reaches the ECAL barrel:
+      else {
+	helix.GetPointOnCircle(_ecalB_inner_r, referencePoint, intersectionPoint);
+      }
+
+      x_ecal = intersectionPoint.GetX();
+      y_ecal = intersectionPoint.GetY();
+      z_ecal = intersectionPoint.GetZ();
+
+      // A correction to the particle time of flight is required to account for
+      // the approximate analytical extrapolation with the helix
+      tof_correction = _tof_correction->Eval(trk_theta);
+
     }
 
     // --- Loop over the muon detector hits
@@ -275,16 +299,20 @@ void MarlinMuonID::processEvent( LCEvent * evt ) {
       unsigned int system = decoder(hit)["system"];
       unsigned int layer = decoder(hit)["layer"];
 
-      // N.B.: The spatial smearing should be applied to the local hit coordinates
-      float x_centered = hit->getPosition()[0] + gsl_ran_gaussian(_rng, _xyzResolution[0]) - x_ecal;
-      float y_centered = hit->getPosition()[1] + gsl_ran_gaussian(_rng, _xyzResolution[1]) - y_ecal;
-      float z_centered = hit->getPosition()[2] + gsl_ran_gaussian(_rng, _xyzResolution[2]) - z_ecal;
+      float x_centered = hit->getPosition()[0] - x_ecal;
+      float y_centered = hit->getPosition()[1] - y_ecal;
+      float z_centered = hit->getPosition()[2] - z_ecal;
 
       float hit_r = std::sqrt(x_centered*x_centered + y_centered*y_centered);
       float hit_phi = std::atan2(y_centered, x_centered); 
       float hit_theta = std::atan2(hit_r, z_centered);
 
-      float deltaR = std::sqrt( (hit_phi-trk_phi)*(hit_phi-trk_phi) + (hit_theta-trk_theta)*(hit_theta-trk_theta) );
+      float dphi = hit_phi - trk_phi;
+      if ( dphi > M_PI ) dphi -= 2.*M_PI;
+      if ( dphi < -M_PI ) dphi += 2.*M_PI;
+      float dtheta = hit_theta - trk_theta;
+
+      float deltaR = std::sqrt( dphi*dphi + dtheta*dtheta );
 
       if ( _fillHistos ){
 	if ( system == _muonDetBarrel){
@@ -305,13 +333,13 @@ void MarlinMuonID::processEvent( LCEvent * evt ) {
       // --- Check if the hit is matched to the track
       if ( deltaR < _deltaRMatch[system-_muonDetBarrel] ){
 
-	// --- Calculate the particle total time of flight
+	// --- Calculate the particle total time of flight to the muon detector hit
 	float dist = std::sqrt(x_centered*x_centered + y_centered*y_centered + z_centered*z_centered);
 	float trk_p = trk_pt/sin(trk_theta);
 	float trk_E = sqrt(trk_p*trk_p + _muonMass*_muonMass);
 
 	float beta = trk_p/trk_E;
-	float tof = (trk_length + dist) / (beta * _lightSpeed) + _tof_correction->Eval(trk_theta);
+	float tof = (trk_length + dist) / (beta * _lightSpeed) + tof_correction;
 
 	float deltaT = hit->getTime() + gsl_ran_gaussian(_rng, _timeResolution) - tof;
 
@@ -328,15 +356,15 @@ void MarlinMuonID::processEvent( LCEvent * evt ) {
 	  _hDeltaT_vs_Theta->Fill(trk_theta,deltaT);
 	}
 
-	if ( system == _muonDetBarrel){
-	  if ( deltaT < _timeWindowB[0] || deltaT > _timeWindowB[1] ) continue;
-	}
+        // Time window selection: use barrel or endcap window depending on system
+        if ( system == _muonDetBarrel ){
+          if ( deltaT < _timeWindowB[0] || deltaT > _timeWindowB[1] ) continue;
+        }
+        else if ( system == _muonDetEndcap ){
+          if ( deltaT < _timeWindowE[0] || deltaT > _timeWindowE[1] ) continue;
+        }
 
-	if ( system == _muonDetEndcap){
-	  if ( deltaT < _timeWindowB[0] || deltaT > _timeWindowB[1] ) continue;
-	}
-
-	n_matchedHits++;
+        n_matchedHits++;
 
       }
 	
@@ -347,16 +375,16 @@ void MarlinMuonID::processEvent( LCEvent * evt ) {
     }
       
     // --- Declare the track a muon if more than _nHitsMatch hits of muon detectors are associated to it
-    if ( n_matchedHits > _nHitsMatch ){
+    if ( n_matchedHits >= _nHitsMatch ){
 
       // --- Create a ReconstructedParticle to store the identified muon
-      IMPL::ReconstructedParticleImpl *const muon(new ReconstructedParticleImpl());
+      IMPL::ReconstructedParticleImpl *const muon(new IMPL::ReconstructedParticleImpl());
 
-      const float charge = ( ts_atCAL->getOmega()>0. ? 1. : -1 );
+      const float charge = ( ts_atIP->getOmega()>0. ? 1. : -1 );
       const int pdg = ( charge < 0. ? _muonPDG : -_muonPDG ); 
       const float momentum[3] = { trk_pt * std::cos(ts_atIP->getPhi()),
-	                          trk_pt * std::sin(ts_atIP->getPhi()),
-				  trk_pt * trk_cotTheta };
+	trk_pt * std::sin(ts_atIP->getPhi()),
+	trk_pt * trk_cotTheta };
       muon->setMomentum(momentum);
       muon->setEnergy(std::sqrt(momentum[0]*momentum[0] + momentum[1]*momentum[1] +
 				momentum[2]*momentum[2] + _muonMass*_muonMass));

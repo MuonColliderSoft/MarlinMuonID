@@ -5,8 +5,13 @@
 #include "gsl/gsl_rng.h"
 
 #include "TFormula.h"
-#include "TH1F.h"
-#include "TH2F.h"
+#include "TH1D.h"
+#include "TH2D.h"
+
+#include <vector>
+#include <string>
+#include <limits>
+#include <cmath>
 
 /**
  * Performs muon identification by matching tracks to muon detector hits.
@@ -27,7 +32,7 @@
 class MarlinMuonID : public marlin::Processor
 {
 public:
-  virtual Processor*  newProcessor() { return new MarlinMuonID ; }
+  virtual marlin::Processor* newProcessor() { return new MarlinMuonID ; }
 
   MarlinMuonID(const MarlinMuonID &) = delete ;
   MarlinMuonID& operator =(const MarlinMuonID &) = delete ;
@@ -75,20 +80,18 @@ private:
   float _d0_max = 0.1; // [mm]
   float _z0_max = 0.1; // [mm]
 
-  std::vector<float> _xyzResolution = {10., 10., 10.}; // [mm]
   float _timeResolution = 0.1; // [ns]
 
   TFormula* _tof_correction = nullptr;
-  std::string _formulaStr = "(x < 0.5735 || x > 2.57) ? 0.015058 : "
-    "(x >= 0.5735 && x < 0.626) ? (-9.63278 + 16.8561*x) : "
-    "(x >= 0.626 && x < 2.516) ? (2.63371 - 4.14427*x + 3.42931*x*x - 1.3498*x*x*x + 0.216549*x*x*x*x) : "
-    "(x >= 2.516 && x < 2.57) ? (43.5031 - 16.9276*x) : 0";
+  std::string _formulaStr = "(x > 0.61086524 && x < 2.5307274) "
+                            "? (-0.0639684 * (x - 1.5707963) * (x - 1.5707963) - 0.0524347) "
+                            ": 0.";
 
   std::vector<float> _deltaRMatch = { 0.2, 0.3}; // 0 --> barrel, 1 --> endcaps
   std::vector<float> _timeWindowB = {-0.3, 0.3}; // [ns]
   std::vector<float> _timeWindowE = {-0.3, 0.3}; // [ns]
 
-  int _nHitsMatch = 4;
+  int _nHitsMatch = 5;
 
   bool _fillHistos = false;
 
