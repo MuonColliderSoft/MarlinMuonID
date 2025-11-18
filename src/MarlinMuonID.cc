@@ -31,14 +31,14 @@ MarlinMuonID::MarlinMuonID()
 
   // --- Register the steering parameters
   registerInputCollection( LCIO::TRACK,
-		  	   "InputTrackCollection",
+			   "InputTrackCollection",
 			   "Track input collection",
 			   _inputTrackCollection,
 			   _inputTrackCollection
 			   );
 
   registerInputCollection( LCIO::CALORIMETERHIT,
-		  	   "InputMuonHitCollection",
+			   "InputMuonHitCollection",
 			   "Muon hit input collection",
 			   _inputMuonHitCollection,
 			   _inputMuonHitCollection
@@ -171,9 +171,9 @@ void MarlinMuonID::init() {
     }
 
     _hDeltaR_vs_Pt = new TH2D("hDeltaR_vs_Pt", "#DeltaR vs p_{T}^{trk};p_{T}^{trk} [GeV];#DeltaR [rad]",
-			         200, 0., 100., 200, 0., 0.5);
+			      200, 0., 100., 200, 0., 0.5);
     _hDeltaT_vs_Pt = new TH2D("hDeltaT_vs_Pt", "#DeltaT vs p_{T}^{trk};p_{T}^{trk} [GeV];#DeltaT [ns]",
-			         200, 0., 100., 200, -0.5, 3.5);
+			      200, 0., 100., 200, -0.5, 3.5);
     _hDeltaR_vs_Theta = new TH2D("hDeltaR_vs_Theta", "#DeltaR vs #theta_{trk};#theta_{trk} [#circ];#DeltaR [rad]",
 				 200, 0., M_PI, 200, 0., 0.5);
     _hDeltaT_vs_Theta = new TH2D("hDeltaT_vs_Theta", "#DeltaT vs #theta_{trk};#theta_{trk} [#circ];#DeltaT [ns]",
@@ -383,8 +383,8 @@ void MarlinMuonID::processEvent( LCEvent * evt ) {
       const float charge = ( ts_atIP->getOmega()>0. ? 1. : -1 );
       const int pdg = ( charge < 0. ? _muonPDG : -_muonPDG ); 
       const float momentum[3] = { trk_pt * std::cos(ts_atIP->getPhi()),
-	                          trk_pt * std::sin(ts_atIP->getPhi()),
-				  trk_pt * trk_cotTheta };
+	trk_pt * std::sin(ts_atIP->getPhi()),
+	trk_pt * trk_cotTheta };
       muon->setMomentum(momentum);
       muon->setEnergy(std::sqrt(momentum[0]*momentum[0] + momentum[1]*momentum[1] +
 				momentum[2]*momentum[2] + _muonMass*_muonMass));
